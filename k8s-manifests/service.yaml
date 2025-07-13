@@ -11,4 +11,8 @@ spec:
     - protocol: TCP
       port: 80
       targetPort: 80  
-  type: ClusterIP  # Change from NodePort to ClusterIP
+      nodePort: 30080 # Fixed NodePort
+  type: NodePort
+      
+  #type: ClusterIP  # Change from NodePort to ClusterIP
+
