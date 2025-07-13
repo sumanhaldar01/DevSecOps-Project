@@ -16,4 +16,4 @@ spec:
       - name: netflix-app
         image: sonuh/netflix:latest
         ports:
-        - containerPort: 3000
+        - containerPort: 80
