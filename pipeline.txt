@@ -78,8 +78,8 @@ pipeline {
                     def imageTag = "${BUILD_NUMBER}"
                     dir('Kubernetes') {
                         sh "sed -i 's|image: sonuh/netflix:.*|image: sonuh/netflix:${imageTag}|' deployment.yml"
-                        sh 'git config user.email "ci@example.com"'
-                        sh 'git config user.name "ci-bot"'
+                        sh 'git config user.email "sonuh269@gmail.com"'
+                        sh 'git config user.name "sumanhaldar01"'
                         sh "git add deployment.yml"
                         sh "git commit -m 'Update image to ${imageTag}' || echo 'No changes to commit'"
                         sh "git push origin main"
