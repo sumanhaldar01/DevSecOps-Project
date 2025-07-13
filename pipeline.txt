@@ -105,7 +105,7 @@ pipeline {
         stage('Deploy to Kubernetes') {
             steps {
                 script {
-                    dir('Kubernetes') {
+                    dir('k8s-manifests') {
                         withKubeConfig(
                             caCertificate: '',
                             clusterName: '',
