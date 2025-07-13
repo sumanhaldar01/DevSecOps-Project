@@ -8,9 +8,9 @@ metadata:
 spec:
   project: default
   source:
-    repoURL: https://github.com/sumanhaldar01/DevSecOps-Project/k8s-manifests # Replace with your repo URL
+    repoURL: https://github.com/sumanhaldar01/DevSecOps-Project
     targetRevision: HEAD
-    path: .
+    path: k8s-manifests
   destination:
     server: https://kubernetes.default.svc
     namespace: default
