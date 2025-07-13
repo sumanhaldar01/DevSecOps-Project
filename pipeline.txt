@@ -1,87 +1,126 @@
-pipeline{
+pipeline {
     agent any
-    tools{
+
+    tools {
         jdk 'jdk17'
         nodejs 'node16'
     }
+
     environment {
-        SCANNER_HOME=tool 'sonar-scanner'
+        SCANNER_HOME = tool 'sonar-scanner'
     }
+
     stages {
-        stage('clean workspace'){
-            steps{
+        stage('Clean Workspace') {
+            steps {
                 cleanWs()
             }
         }
-        stage('Checkout from Git'){
-            steps{
+
+        stage('Checkout from Git') {
+            steps {
                 git branch: 'main', url: 'https://github.com/sumanhaldar01/DevSecOps-Project.git'
             }
         }
-        stage("Sonarqube Analysis "){
-            steps{
+
+        stage('SonarQube Analysis') {
+            steps {
                 withSonarQubeEnv('sonar-server') {
-                    sh ''' $SCANNER_HOME/bin/sonar-scanner -Dsonar.projectName=DevSecOps-Netflix \
-                    -Dsonar.projectKey=DevSecOps-Netflix '''
+                    sh '''$SCANNER_HOME/bin/sonar-scanner \
+                    -Dsonar.projectName=DevSecOps-Netflix \
+                    -Dsonar.projectKey=DevSecOps-Netflix'''
                 }
             }
         }
-        stage("quality gate"){
-           steps {
+
+        stage('Quality Gate') {
+            steps {
                 script {
-                    waitForQualityGate abortPipeline: false, credentialsId: 'Sonar-token' 
+                    waitForQualityGate abortPipeline: false, credentialsId: 'Sonar-token'
                 }
-            } 
+            }
         }
+
         stage('Install Dependencies') {
             steps {
                 sh "npm install"
             }
         }
-        stage('OWASP FS SCAN') {
+
+        stage('OWASP Dependency Check') {
             steps {
                 dependencyCheck additionalArguments: '--scan ./ --disableYarnAudit --disableNodeAudit', odcInstallation: 'DP-check'
                 dependencyCheckPublisher pattern: '**/dependency-check-report.xml'
             }
         }
-        stage('TRIVY FS SCAN') {
+
+        stage('Trivy File System Scan') {
             steps {
                 sh "trivy fs . > trivyfs.txt"
             }
         }
-        stage("Docker Build & Push"){
-            steps{
-                script{
-                   withDockerRegistry(credentialsId: 'docker', toolName: 'docker'){   
-                       sh "docker build --build-arg TMDB_V3_API_KEY=<yourtmdbapikey> -t netflix ."
-                       sh "docker tag netflix sonuh/netflix:latest "
-                       sh "docker push sonuh/netflix:latest "
-                    }
-                }
-            }
-        }
-        stage("TRIVY"){
-            steps{
-                sh "trivy image sonuh/netflix:latest > trivyimage.txt" 
-            }
-        }
-        stage('Deploy to container'){
-            steps{
-                sh 'docker run -d -p 8081:80 sonuh/netflix:latest'
-            }
-        }
-        stage('Deploy to kubernets'){
-            steps{
-                script{
-                    dir('Kubernetes') {
-                        withKubeConfig(caCertificate: '', clusterName: '', contextName: '', credentialsId: 'k8s', namespace: '', restrictKubeConfigAccess: false, serverUrl: '') {
-                                sh 'kubectl apply -f deployment.yml'
-                                sh 'kubectl apply -f service.yml'
-                        }   
+
+        stage("Docker Build & Push") {
+            steps {
+                script {
+                    withDockerRegistry(credentialsId: 'docker', toolName: 'docker') {
+                        def imageTag = "${BUILD_NUMBER}"
+                        sh "docker build --build-arg TMDB_V3_API_KEY=<yourtmdbapikey> -t sonuh/netflix:${imageTag} ."
+                        sh "docker push sonuh/netflix:${imageTag}"
                     }
                 }
             }
         }
 
+        stage("Update K8s Manifests") {
+            steps {
+                script {
+                    def imageTag = "${BUILD_NUMBER}"
+                    dir('Kubernetes') {
+                        sh "sed -i 's|image: sonuh/netflix:.*|image: sonuh/netflix:${imageTag}|' deployment.yml"
+                        sh 'git config user.email "ci@example.com"'
+                        sh 'git config user.name "ci-bot"'
+                        sh "git add deployment.yml"
+                        sh "git commit -m 'Update image to ${imageTag}' || echo 'No changes to commit'"
+                        sh "git push origin main"
+                    }
+                }
+            }
+        }
+
+        stage('Trivy Image Scan') {
+            steps {
+                def imageTag = "${BUILD_NUMBER}"
+                sh "trivy image sonuh/netflix:${imageTag} > trivyimage.txt"
+            }
+        }
+
+        stage('Deploy to Container') {
+            steps {
+                def imageTag = "${BUILD_NUMBER}"
+                sh "docker run -d -p 8081:80 sonuh/netflix:${imageTag}"
+            }
+        }
+
+        stage('Deploy to Kubernetes') {
+            steps {
+                script {
+                    dir('Kubernetes') {
+                        withKubeConfig(
+                            caCertificate: '',
+                            clusterName: '',
+                            contextName: '',
+                            credentialsId: 'k8s',
+                            namespace: '',
+                            restrictKubeConfigAccess: false,
+                            serverUrl: ''
+                        ) {
+                            sh 'kubectl apply -f deployment.yml'
+                            sh 'kubectl apply -f service.yml'
+                        }
+                    }
+                }
+            }
+        }
     }
 }
